@@ -5,6 +5,7 @@ import com.example.intelli.model.LanguageResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -13,6 +14,7 @@ import org.springframework.web.reactive.function.client.WebClient;
  */
 @Component
 public class VectorDbClient {
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(VectorDbClient.class);
     private static final String COLLECTION = "intelli_cache";
     private final ObjectMapper objectMapper;
     private final WebClient webClient;
@@ -41,6 +43,15 @@ public class VectorDbClient {
         save("tech", inputText, language, response);
     }
 
+    @Async
+    public void saveTechAsync(String inputText, String language, TechResponse response) {
+        try {
+            saveTech(inputText, language, response);
+        } catch (Exception e) {
+            logger.error("Async saveTech failed", e);
+        }
+    }
+
     /**
      * Search for a similar language response in the vector DB.
      */
@@ -53,6 +64,15 @@ public class VectorDbClient {
      */
     public void saveLanguage(String inputText, String language, LanguageResponse response) {
         save("language", inputText, language, response);
+    }
+
+    @org.springframework.scheduling.annotation.Async
+    public void saveLanguageAsync(String inputText, String language, LanguageResponse response) {
+        try {
+            saveLanguage(inputText, language, response);
+        } catch (Exception e) {
+            logger.error("Async saveLanguage failed", e);
+        }
     }
 
     private <T> T findSimilar(String inputText, String language, float threshold, String mode, Class<T> clazz) {

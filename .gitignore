@@ -1,0 +1,12 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+qdrant_storage/
+*.log
+# Ignore compiled Java classes
+*.class
+
+# Ignore Maven/Gradle build directories
+target/
+build/
+out/
