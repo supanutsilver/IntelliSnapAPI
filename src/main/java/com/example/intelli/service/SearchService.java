@@ -13,6 +13,17 @@ import reactor.core.publisher.Flux;
 
 @Service
 public class SearchService {
+    // ... existing fields and constructor
+
+    public String chatBotClaude(String message) {
+        return claudeClient.chatBotClaude(message);
+    }
+
+    public Flux<ServerSentEvent<String>> chatBotClaudeStream(String message) {
+        return claudeClient.streamClaudeSse(message)
+            .filter(chunk -> chunk != null && !chunk.trim().isEmpty())
+            .map(chunk -> ServerSentEvent.builder(chunk).build());
+    }
     private final VectorDbClient vectorDbClient;
     private final ClaudeClient claudeClient;
 
@@ -48,7 +59,7 @@ public class SearchService {
         return response;
     }
     
-    public Flux<ServerSentEvent<String>> chatBotClaudeSse(SearchRequest request) {
+    public Flux<ServerSentEvent<String>> searchContextClaudeSse(SearchRequest request) {
         org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SearchService.class);
         String prompt = "Explain the following technology concept in simple terms, provide 2 main use cases, and 2 code examples.\n\n" + request.getInputText();
         logger.info("[streamClaudeSse] Received streaming request for inputText: {}", request.getInputText());

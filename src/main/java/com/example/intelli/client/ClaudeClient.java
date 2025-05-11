@@ -7,6 +7,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.example.intelli.model.ClaudeMessage;
+import com.example.intelli.model.ClaudeRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +30,10 @@ import java.util.Map;
  */
 @Component
 public class ClaudeClient {
+    // ... existing fields and methods
+    public String chatBotClaude(String message) {
+        return callClaudeApi(message);
+    }
     private static final Logger logger = LoggerFactory.getLogger(ClaudeClient.class);
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
@@ -41,30 +47,9 @@ public class ClaudeClient {
     private static final String CLAUDE_API_KEY_JSON_KEY = "claude-api-key";
 
     // New DTOs for Claude Messages API
-    static class Message {
-        private String role;
-        private String content;
 
-        public String getRole() { return role; }
-        public void setRole(String role) { this.role = role; }
-        public String getContent() { return content; }
-        public void setContent(String content) { this.content = content; }
-    }
 
-    static class ClaudeRequest {
-        private String model;
-        @JsonProperty("max_tokens")
-        private int maxTokens;
-        private List<Message> messages;
-        // private double temperature; // Could add if needed
 
-        public String getModel() { return model; }
-        public void setModel(String model) { this.model = model; }
-        public int getMaxTokens() { return maxTokens; }
-        public void setMaxTokens(int maxTokens) { this.maxTokens = maxTokens; }
-        public List<Message> getMessages() { return messages; }
-        public void setMessages(List<Message> messages) { this.messages = messages; }
-    }
 
     private final AwsSecretsService awsSecretsService;
 
@@ -185,7 +170,7 @@ public class ClaudeClient {
         ClaudeRequest claudeRequest = new ClaudeRequest();
         claudeRequest.setModel(this.claudeModel); // Use instance field 'claudeModel' from properties
         claudeRequest.setMaxTokens(MAX_TOKENS); 
-        Message userMessage = new Message();
+        ClaudeMessage userMessage = new ClaudeMessage();
         userMessage.setRole("user");
         userMessage.setContent(userPrompt);
         claudeRequest.setMessages(Collections.singletonList(userMessage));
