@@ -15,10 +15,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
 
 import jakarta.annotation.PostConstruct;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Client for interacting with Claude API using the Messages API.
@@ -241,5 +244,87 @@ public class ClaudeClient {
             logger.error("Unexpected error calling Claude API or processing its response: {}", e.getMessage(), e);
             return "{\"error\":\"Unexpected error during Claude API call\"}";
         }
+    }
+
+    public Flux<String> streamClaudeSse(String prompt) {
+        if (this.claudeApiKey == null) {
+            init(); // Ensure API key is loaded
+        }
+        if (this.claudeApiKey == null) {
+            logger.error("Claude API key is not initialized after init(). Cannot make streaming call.");
+            return Flux.error(new IllegalStateException("Claude API key not initialized."));
+        }
+
+        Map<String, Object> message = new HashMap<>();
+        message.put("role", "user");
+        message.put("content", prompt);
+
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("model", this.claudeModel);
+        requestBody.put("max_tokens", MAX_TOKENS);
+        requestBody.put("stream", true);
+        requestBody.put("messages", Collections.singletonList(message));
+
+        String requestBodyJson;
+        try {
+            requestBodyJson = objectMapper.writeValueAsString(requestBody);
+        } catch (JsonProcessingException e) {
+            logger.error("Error serializing stream request body: {}", e.getMessage(), e);
+            return Flux.error(e);
+        }
+        
+        logger.info("[ClaudeClient] Sending streaming request to Claude /v1/messages");
+        logger.info("[ClaudeClient] Request body: {}", requestBodyJson);
+        logger.info("[ClaudeClient] Headers: x-api-key=***, anthropic-version={}, anthropic-beta=messages-2023-12-15, Content-Type=application/json, Accept=text/event-stream", ANTHROPIC_VERSION_HEADER_VALUE);
+
+        return this.webClient.post()
+                .uri("/v1/messages")
+                .header("x-api-key", this.claudeApiKey)
+                .header("anthropic-version", ANTHROPIC_VERSION_HEADER_VALUE)
+                .header("anthropic-beta", "messages-2023-12-15")
+                .header("Content-Type", "application/json")
+                .header("Accept", "text/event-stream")
+                .bodyValue(requestBodyJson)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .doOnNext(jsonDataLine -> logger.info("[ClaudeClient] Raw SSE line: {}", jsonDataLine))
+                .flatMap(jsonDataLine -> { 
+                    if (jsonDataLine.trim().isEmpty()) { 
+                        return Flux.empty();
+                    }
+                    if ("[DONE]".equals(jsonDataLine.trim())) {
+                        logger.info("[ClaudeClient] Received [DONE] marker, stream ending.");
+                        return Flux.empty(); 
+                    }
+
+                    try {
+                        JsonNode eventNode = objectMapper.readTree(jsonDataLine);
+                        String eventType = eventNode.path("type").asText();
+
+                        if ("content_block_delta".equals(eventType)) {
+                            JsonNode deltaNode = eventNode.path("delta");
+                            if ("text_delta".equals(deltaNode.path("type").asText())) {
+                                String textChunk = deltaNode.path("text").asText();
+                                if (textChunk != null && !textChunk.isEmpty()) {
+                                    logger.debug("[ClaudeClient] Extracted text_delta: '{}'", textChunk);
+                                    return Flux.just(textChunk);
+                                }
+                            }
+                        } else if ("error".equals(eventType)) {
+                            String errorType = eventNode.path("error").path("type").asText("unknown_error");
+                            String errorMessage = eventNode.path("error").path("message").asText("Unknown streaming error");
+                            logger.error("[ClaudeClient] Claude API streaming error event: Type: {}, Message: {}", errorType, errorMessage);
+                            return Flux.error(new RuntimeException("Claude API error (" + errorType + "): " + errorMessage));
+                        } else {
+                            logger.debug("[ClaudeClient] Received SSE event of type '{}', not a text_delta.", eventType);
+                        }
+                        return Flux.empty(); 
+                    } catch (JsonProcessingException e) {
+                        logger.warn("[ClaudeClient] Error parsing supposed JSON line: '{}'. Raw line: '{}'", e.getMessage(), jsonDataLine);
+                        return Flux.empty(); 
+                    }
+                })
+                .doOnError(e -> logger.error("[ClaudeClient] Error in Claude SSE processing pipeline: {}", e.getMessage(), e))
+                .doOnComplete(() -> logger.info("[ClaudeClient] Claude SSE Flux processing completed."));
     }
 }

@@ -1,5 +1,7 @@
 package com.example.intelli.controller;
 
+import org.springframework.http.codec.ServerSentEvent;
+
 import com.example.intelli.model.SearchRequest;
 import com.example.intelli.model.TechResponse;
 import com.example.intelli.model.LanguageResponse;
@@ -10,6 +12,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
+import reactor.core.publisher.Flux;
+import org.springframework.http.MediaType;
+
+import java.time.Duration;
 
 @RestController
 @RequestMapping("/intelli")
@@ -36,5 +42,17 @@ public class SearchController {
             log.warn("Invalid mode received: {}", request.getMode());
             return ResponseEntity.badRequest().body("Invalid mode");
         }
+    }
+
+    @PostMapping(value = "/chatbot/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> streamSearch(@RequestBody SearchRequest request) {
+        return searchService.chatBotClaudeSse(request);
+    }
+
+    @PostMapping(value = "/test/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> testSse() {
+        return Flux.interval(Duration.ofSeconds(1))
+                .take(5)
+                .map(i -> ServerSentEvent.builder("tick " + i).build());
     }
 }
