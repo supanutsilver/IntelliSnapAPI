@@ -8,12 +8,14 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import java.util.ArrayList;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -32,7 +34,7 @@ public class SecurityConfig {
     public UserDetailsService userDetailsServiceBean() { 
         return username -> {
             logger.info("UserDetailsService (SecurityConfig): Creating UserDetails for deviceId (username): {}", username);
-            return new User(username, "", new ArrayList<>()); 
+            return new User(username, "", List.of(new SimpleGrantedAuthority("ROLE_USER")));
         };
     }
 
@@ -46,7 +48,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) 
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers("/auth/**").permitAll() 
-                .requestMatchers("/intelli/**").authenticated() 
+                .requestMatchers("/intelli/**").authenticated()
                 .anyRequest().authenticated() 
             )
             .addFilterBefore(customJwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class); 

@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import com.example.intelli.service.SearchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import java.util.Map;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import reactor.core.publisher.Flux;
@@ -44,15 +45,28 @@ public class SearchController {
         }
     }
 
-    @PostMapping(value = "/chatbot/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PostMapping(value = "/search/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> streamSearch(@RequestBody SearchRequest request) {
-        return searchService.chatBotClaudeSse(request);
+        return searchService.searchContextClaudeSse(request);
     }
 
-    @PostMapping(value = "/test/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public Flux<ServerSentEvent<String>> testSse() {
-        return Flux.interval(Duration.ofSeconds(1))
-                .take(5)
-                .map(i -> ServerSentEvent.builder("tick " + i).build());
+//    @PostMapping("/chatbot")
+//    public ResponseEntity<?> chatBotClaude(@RequestBody Map<String, String> payload) {
+//        String message = payload.get("message");
+//        if (message == null || message.isBlank()) {
+//            return ResponseEntity.badRequest().body("Message cannot be empty");
+//        }
+//        String reply = searchService.chatBotClaude(message);
+//        return ResponseEntity.ok(Map.of("reply", reply));
+//    } // Only one instance of this method should exist.
+
+    @PostMapping(value = "/chatbot/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> chatBotClaudeStream(@RequestBody Map<String, String> payload) {
+        String message = payload.get("message");
+        if (message == null || message.isBlank()) {
+            return Flux.error(new IllegalArgumentException("Message cannot be empty"));
+        }
+        return searchService.chatBotClaudeStream(message);
     }
+
 }
